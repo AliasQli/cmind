@@ -2,8 +2,12 @@ package model
 
 import (
 	"context"
+	"fmt"
+	"github.com/PuerkitoBio/goquery"
 	"github.com/groovili/gogtrends"
+	"net/http"
 	"time"
+	"unicode/utf16"
 )
 
 var (
@@ -14,7 +18,7 @@ func getContext() (context.Context, context.CancelFunc){
 	return context.WithTimeout(ctxBG, 5 * time.Second)
 }
 
-func getSingleRelatedTopics(word string) ([]*gogtrends.RankedKeyword, error) {
+func getGoogleRelated(word string) ([]string, error) {
 	ctx, cancel := getContext()
 	defer cancel()
 	explore, err := gogtrends.Explore(ctx,
@@ -41,7 +45,16 @@ func getSingleRelatedTopics(word string) ([]*gogtrends.RankedKeyword, error) {
 		}
 	}
 
-	return gogtrends.Related(ctx, explore[index], "ZH")
+	relT, err := gogtrends.Related(ctx, explore[index], "ZH")
+	if err !=nil {
+		return nil, err
+	}
+	relT = removeDuplicate(relT)
+	relL := make([]string, len(relT))
+	for i, v := range relT {
+		relL[i] = v.Topic.Title
+	}
+	return relL, nil
 }
 
 func removeDuplicate(slice []*gogtrends.RankedKeyword) []*gogtrends.RankedKeyword {
@@ -68,36 +81,51 @@ func removeDuplicate(slice []*gogtrends.RankedKeyword) []*gogtrends.RankedKeywor
 	return ret
 }
 
-func GetSingleRelatedWordList(word string) ([]string, error) {
-	relT, err := getSingleRelatedTopics(word)
+func getAizhanRelated(word string) ([]string, error) {
+	encoded := ""
+	for _, i := range utf16.Encode([]rune(word)) {
+		if i < 256 {
+			encoded += "n"
+		}
+		encoded += fmt.Sprintf("%x", i)
+	}
+
+	req, err := http.NewRequest("GET", fmt.Sprintf("https://ci.aizhan.com/%s/", encoded), nil)
 	if err != nil {
 		return nil, err
 	}
 
-	relT = removeDuplicate(relT)
-
-	relL := make([]string, len(relT))
-	for i, v := range relT {
-		relL[i] = v.Topic.Title
+	req.Header.Add("User-Agent", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.77 Safari/537.36")
+	client := &http.Client{}
+	res, err := client.Do(req)
+	if err != nil {
+		return nil, err
 	}
-	return relL, nil
+
+	doc, err := goquery.NewDocumentFromReader(res.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	related := make([]string, 0, 5)
+	doc.Find(".title a").EachWithBreak(func(i int, s *goquery.Selection) bool {
+		related = append(related, s.Text())
+		return i < 4
+	})
+	return related, nil
 }
 
-func GetSingleRelatedCategorized(word string) (map[string][]string, error) {
-	relT, err := getSingleRelatedTopics(word)
-	if err != nil {
+func GetRelatedWordList(word string) ([]string, error) {
+	g, err := getGoogleRelated(word)
+	if err != nil && len(g) > 5 {
+		return g, nil
+	}
+
+	a, err2 := getAizhanRelated(word)
+
+	if err != nil && err2 != nil {
 		return nil, err
 	}
 
-	relT = removeDuplicate(relT)
-
-	relM := make(map[string][]string)
-	for _, v := range relT {
-		if relM[v.Topic.Type] == nil {
-			relM[v.Topic.Type] = []string {v.Topic.Title}
-		} else {
-			relM[v.Topic.Type] = append(relM[v.Topic.Type], v.Topic.Title)
-		}
-	}
-	return relM, nil
+	return append(g, a...), nil
 }

@@ -9,14 +9,7 @@ import (
 
 func GetSingleWordRelated(c echo.Context) error {
 	word := c.QueryParam("word")
-	categorized := c.QueryParam("categorized") == "true"
-	var data interface{}
-	var err error
-	if categorized {
-		data, err = model.GetSingleRelatedCategorized(word)
-	} else {
-		data, err = model.GetSingleRelatedWordList(word)
-	}
+	data, err := model.GetRelatedWordList(word)
 	if err != nil {
 		return context.Error(c, http.StatusInternalServerError, err.Error())
 	}

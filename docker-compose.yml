@@ -9,6 +9,6 @@ services:
     command: "go run main.go"
     ports:
       - 3000:3000
-#    environment:
-#      - GOPROXY=goproxy.cn
+    environment:
+      - GOPROXY=goproxy.cn
     container_name: app
