@@ -1,0 +1,12 @@
+version: '3'
+
+services:
+  app:
+    image: golang:alpine
+    volume:
+      - ./src:/app
+    working_dir: /app
+    command: "bash"
+    ports:
+      - 3000:3000
+    container_name: app
