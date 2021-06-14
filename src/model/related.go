@@ -117,12 +117,13 @@ func getAizhanRelated(word string) ([]string, error) {
 
 func GetRelatedWordList(word string) ([]string, error) {
 	g, err := getGoogleRelated(word)
+	fmt.Println("Google: ", err)
 	if err != nil && len(g) > 5 {
 		return g, nil
 	}
 
 	a, err2 := getAizhanRelated(word)
-
+	fmt.Println("Aizhan: ", err2)
 	if err != nil && err2 != nil {
 		return nil, err
 	}
